@@ -38,8 +38,9 @@ input { font-family: inherit; }
 .quick { display:flex; gap:6px; overflow-x:auto; padding: 8px 12px; scrollbar-width: none; background:#fff; border-top:1px solid #f0f2f4; }
 .chip { flex: 0 0 auto; background: var(--acc2); border:none; color: #1b64da; border-radius: 999px; padding: 7px 12px; font-size: 13px; }
 .pinput { display:flex; gap:8px; padding: 6px 12px 20px; background:#fff; }
-.pinput input { flex:1; padding: 11px 16px; border-radius: 999px; border:1px solid var(--line); background: #f2f4f6; color: var(--fg); font-size: 14.5px; }
-.pinput input:focus { outline:none; border-color: var(--acc); background:#fff; }
+.pinput textarea { flex:1; padding: 11px 16px; border-radius: 22px; border:1px solid var(--line); background: #f2f4f6; color: var(--fg); font-size: 14.5px; font-family: inherit; resize: none; line-height: 1.45; max-height: 140px; }
+.pinput textarea:focus { outline:none; border-color: var(--acc); background:#fff; }
+.pinput { align-items: flex-end; }
 .send { width: 42px; height: 42px; border-radius: 50%; background: var(--acc); border: none; color: white; font-weight: 800; font-size: 18px; padding: 0; }
 
 /* board */
@@ -100,3 +101,17 @@ input { font-family: inherit; }
 .verify { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; margin-top: 12px; }
 
 .errbox { background:#fdecee; color:#b3261e; border-radius: 12px; padding: 10px 12px; margin-top: 10px; font-size: 13.5px; display:flex; flex-direction:column; gap: 2px; }
+
+.aud { display:flex; flex-direction:column; gap: 3px; width: 100%; }
+.aud-row { display:flex; justify-content:space-between; align-items:center; gap: 6px; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; background: #f2f4f6; color: #8b95a1; }
+.aud-who { white-space: nowrap; }
+.aud-row.open { background: #e6f8f1; color: #0b8a5c; }
+.aud-who { font-weight: 600; color: var(--fg); } .aud-row.lock .aud-who { color: #8b95a1; }
+.aud-sees { font-weight: 700; text-align: right; }
+.aud.compact .aud-row { padding: 3px 7px; font-size: 12px; }
+.tpl-msg { font-size: 12.5px; color: #4e5968; background: #f9fafb; border-left: 3px solid var(--line); padding: 6px 8px; border-radius: 0 8px 8px 0; margin: 2px 0 4px; line-height: 1.4; }
+.tpl-cta { font-size: 12px; color: var(--acc); font-weight: 700; margin-top: 2px; }
+.scard.on { border-color: var(--acc); background: var(--acc2); }
+.chip.on { background: var(--acc); color: #fff; }
+.scen { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 1400px) { .scen { grid-template-columns: repeat(5, 1fr); } }

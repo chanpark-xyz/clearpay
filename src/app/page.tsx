@@ -13,11 +13,11 @@ type Lens = "public" | "to" | "taxoffice" | "me";
 
 /** Templates: clicking fills the phone input (the user still presses send). */
 const TEMPLATES = [
-  { id: "rent", icon: "🏠", title: "월세", msg: "이번 달 월세 50 집주인 박상민에게. 월세 세액공제 받고 싶어요", tax: "월세 세액공제 15~17%", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /월세/ },
-  { id: "allowance", icon: "👩", title: "부모님 용돈", msg: "어머니께 용돈 30 보내줘", tax: "증여세 비과세", profile: { privacyPolicy: "all-private", disclosureMode: "none" }, match: /증여|용돈|생활비/ },
-  { id: "freelance", icon: "🎨", title: "외주비", msg: "프리랜서 이지은에게 로고 디자인 외주비 100", tax: "원천징수 3.3%", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /사업소득|원천|외주/ },
-  { id: "donation", icon: "🐶", title: "기부", msg: "유기견 보호소에 30 기부. 연말정산 영수증 필요해요", tax: "기부금 세액공제 15%", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /기부/ },
-  { id: "gift", icon: "💐", title: "축의금", msg: "친구 결혼식 축의금 10 박상민에게. 누가 냈는지는 남겨도 돼", tax: "개인 간 비과세", profile: { privacyPolicy: "from-to", disclosureMode: "public" }, match: /경조|축의|부의/ },
+  { id: "rent", icon: "🏠", title: "월세", msg: "이번 달 월세 50 집주인 박상민에게. 월세 세액공제 받고 싶어요", tax: "월세 세액공제 15~17%", to: "donor2", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /월세/ },
+  { id: "allowance", icon: "👩", title: "부모님 용돈", msg: "어머니께 용돈 30 보내줘", tax: "증여세 비과세", to: "parent", profile: { privacyPolicy: "all-private", disclosureMode: "none" }, match: /증여|용돈|생활비/ },
+  { id: "freelance", icon: "🎨", title: "외주비", msg: "프리랜서 이지은에게 로고 디자인 외주비 100", tax: "원천징수 3.3%", to: "freelancer", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /사업소득|원천|외주/ },
+  { id: "donation", icon: "🐶", title: "기부", msg: "유기견 보호소에 30 기부. 연말정산 영수증 필요해요", tax: "기부금 세액공제 15%", to: "charity", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /기부/ },
+  { id: "gift", icon: "💐", title: "축의금", msg: "친구 결혼식 축의금 10 박상민에게. 누가 냈는지는 남겨도 돼", tax: "개인 간 비과세", to: "donor2", profile: { privacyPolicy: "from-to", disclosureMode: "public" }, match: /경조|축의|부의/ },
 ];
 const FIELD_KO: Record<Field, string> = { amount: "금액", from: "보내는 사람", to: "받는 사람" };
 const ACTION_KO: Record<string, string> = { deposit: "공개 예치", final_transfer: "비공개 전송", withdraw: "공개 출금" };
@@ -30,12 +30,24 @@ const audienceOf = (p: Pick<Profile, "disclosureMode" | "disclosureTo">, label: 
 const templateOf = (p: Payment) => TEMPLATES.find((s) => s.match.test(p.tax?.category ?? "") || s.match.test(p.memo)) ?? null;
 const statusKo = (s: string) => (s === "done" ? "완료" : s === "executing" ? "보내는 중" : s === "failed" ? "실패" : "제안");
 
-function Glyphs({ profile, label }: { profile: Pick<Profile, "privacyPolicy" | "disclosureMode" | "disclosureTo">; label: (n?: string) => string }) {
-  const f = fieldsOf(profile); const a = audienceOf(profile, label);
+/** Who sees what — one row per audience. Much more intuitive than per-field icons. */
+function Audience({ profile, to, label, compact = false }: { profile: Pick<Profile, "privacyPolicy" | "disclosureMode" | "disclosureTo">; to?: string; label: (n?: string) => string; compact?: boolean }) {
+  const f = fieldsOf(profile);
+  const names = (["amount", "from", "to"] as Field[]).filter((k) => f.has(k)).map((k) => FIELD_KO[k]);
+  const all = names.length === 3 ? "전부" : names.join("·");
+  const rows: { icon: string; who: string; sees: string | null }[] = [
+    { icon: "🌐", who: "대중", sees: profile.disclosureMode === "public" && names.length ? all : null },
+    { icon: "👤", who: to ? label(to) : "받는 사람", sees: "금액" },
+    { icon: "🏛️", who: "국세청", sees: profile.disclosureMode === "recipient-encrypted" && profile.disclosureTo === "taxoffice" && names.length ? all : null },
+  ];
   return (
-    <div className={`glyphs ${a.key}`}>
-      {(["amount", "from", "to"] as Field[]).map((k) => <span key={k} className={`g ${f.has(k) ? "open" : "lock"}`}>{f.has(k) ? "👁" : "🔒"}<i>{FIELD_KO[k]}</i></span>)}
-      <span className="aud">{f.size ? `→ ${a.text}` : "→ 아무도"}</span>
+    <div className={`aud ${compact ? "compact" : ""}`}>
+      {rows.map((r) => (
+        <div key={r.who} className={`aud-row ${r.sees ? "open" : "lock"}`}>
+          <span className="aud-who">{r.icon} {r.who}</span>
+          <span className="aud-sees">{r.sees ? `👁 ${r.sees}` : "🔒 비공개"}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -44,6 +56,7 @@ export default function Home() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [history, setHistory] = useState<unknown[]>([]);
   const [input, setInput] = useState("");
+  const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | "think" | "exec">(false);
   const [state, setState] = useState<State | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -52,7 +65,7 @@ export default function Home() {
   const [receipt, setReceipt] = useState<{ rows: { id: string; category: string; amountOkrw: number | null; from: string; to: string; verified: boolean }[]; summary: string } | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = async () => { const r = await fetch("/api/state"); setState(await r.json()); };
   useEffect(() => { refresh(); }, []);
@@ -65,10 +78,10 @@ export default function Home() {
   const payments = state?.payments ?? [];
   const open = payments.find((p) => p.id === openId) ?? msgs.slice().reverse().find((m) => m.payment?.id === openId)?.payment;
 
-  const useTemplate = (msg: string) => { setInput(msg); inputRef.current?.focus(); };
+  const useTemplate = (t: { id: string; msg: string }) => { setInput(t.msg); setPicked(t.id); setTimeout(() => { const el = inputRef.current; if (el) { el.focus(); el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; } }, 0); };
   const send = async (text: string) => {
     if (!text.trim() || busy) return;
-    setInput(""); setBusy("think");
+    setInput(""); setBusy("think"); if (inputRef.current) inputRef.current.style.height = "auto";
     setMsgs((m) => [...m, { role: "user", content: text }]);
     try {
       const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ history, message: text }) });
@@ -112,7 +125,7 @@ export default function Home() {
     <main className="wrap">
       <header className="top">
         <div><h1>ClearPay</h1><div className="muted">세무 비서에게 말하면, 세금 증빙에 필요한 만큼만 공개하고 보냅니다</div></div>
-        <div className="row small"><span className="badge">LLM {state?.provider === "api" ? "SKT A.X K2" : state?.provider ?? "…"}</span><span className="badge">Maroo Testnet · 1 tOKRW = 1만 원</span><span className="legend"><span className="g open">👁</span>공개 <span className="g lock">🔒</span>비공개</span></div>
+        <div className="row small"><span className="badge">LLM {state?.provider === "api" ? "SKT A.X K2" : state?.provider ?? "…"}</span><span className="badge">Maroo Testnet · 1 tOKRW = 1만 원</span><span className="legend">👁 보임 · 🔒 비공개</span></div>
       </header>
 
       <div className="stage">
@@ -126,24 +139,26 @@ export default function Home() {
               : <div key={i} className={`bubble ${m.role}`}>{m.content}</div>)}
             {busy === "think" && <div className="bubble assistant typing"><span /><span /><span /></div>}
           </div>
-          <div className="quick">{TEMPLATES.map((s) => <button key={s.id} className="chip" onClick={() => useTemplate(s.msg)} disabled={!!busy}>{s.icon} {s.title}</button>)}</div>
+          <div className="quick">{TEMPLATES.map((s) => <button key={s.id} className={`chip ${picked === s.id ? "on" : ""}`} onClick={() => useTemplate(s)} disabled={!!busy}>{s.icon} {s.title}</button>)}</div>
           <div className="pinput">
-            <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)} placeholder="메시지" disabled={!!busy} />
+            <textarea ref={inputRef} value={input} rows={1} onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(input); } }} placeholder="메시지 (Shift+Enter 줄바꿈)" disabled={!!busy} />
             <button className="send" onClick={() => send(input)} disabled={!!busy}>↑</button>
           </div>
         </div>
 
         <section className="board">
-          <div className="sechead"><h3>템플릿</h3><span className="muted small">누르면 왼쪽 입력창에 채워집니다. 고쳐서 보내도 돼요</span></div>
+          <div className="sechead"><h3>템플릿</h3><span className="muted small">누르면 왼쪽 입력창에 문장이 들어갑니다. 고쳐서 보내세요</span></div>
           <div className="scen">
             {TEMPLATES.map((s) => {
               const n = payments.filter((p) => p.status === "done" && templateOf(p)?.id === s.id).length;
               return (
-                <button key={s.id} className="scard" onClick={() => useTemplate(s.msg)} disabled={!!busy}>
+                <button key={s.id} className={`scard ${picked === s.id ? "on" : ""}`} onClick={() => useTemplate(s)} disabled={!!busy}>
                   <div className="row between"><span className="icon">{s.icon}</span>{n > 0 && <span className="count">{n}건</span>}</div>
                   <b>{s.title}</b>
                   <div className="small muted">{s.tax}</div>
-                  <Glyphs profile={s.profile} label={short} />
+                  <div className="tpl-msg">“{s.msg}”</div>
+                  <Audience profile={s.profile} to={s.to} label={short} compact />
+                  <div className="tpl-cta">{picked === s.id ? "✓ 입력창에 들어갔어요" : "✎ 입력창에 넣기"}</div>
                 </button>
               );
             })}
@@ -158,7 +173,7 @@ export default function Home() {
                 <button key={p.id} className={`trow ${p.status}`} onClick={() => { setOpenId(p.id); setLens("public"); }}>
                   <span className="icon">{s?.icon ?? "💸"}</span>
                   <span className="tmain"><b>{won(p.amountOkrw)}</b> <span className="muted">→ {short(p.to)}</span><div className="small muted">{p.tax?.category ?? p.kind}{p.tax?.benefitOkrw != null ? ` · 예상 공제 ${won(p.tax.benefitOkrw)}` : ""}</div></span>
-                  <Glyphs profile={p.profile} label={short} />
+                  <Audience profile={p.profile} to={p.to} label={short} compact />
                   <span className={`status ${p.status}`}>{statusKo(p.status)}</span>
                 </button>
               );
@@ -254,7 +269,7 @@ function PayCard({ p, label, onOpen, onExecute, busy }: { p: Payment; label: (n?
     <div className={`paycard ${p.status}`} onClick={onOpen}>
       <div className="row between"><span className="small muted">{p.tax?.category ?? p.kind}</span><b className="pc-amt">{won(p.amountOkrw)}</b></div>
       <div className="small">{label(p.from)} → <b>{label(p.to)}</b>{p.tax?.benefitOkrw != null ? <span className="muted"> · 예상 공제 {won(p.tax.benefitOkrw)}</span> : null}</div>
-      <Glyphs profile={p.profile} label={label} />
+      <Audience profile={p.profile} to={p.to} label={label} compact />
       {p.status === "proposed" && <button className="primary full" disabled={busy} onClick={(e) => { e.stopPropagation(); onExecute(p.id); }}>이대로 보내기</button>}
       {p.status === "executing" && <div className="steps small"><span className={`step ${done.has("deposit") ? "ok" : "active"}`}>예치</span><span className={`step ${done.has("final_transfer") ? "ok" : done.has("deposit") ? "active" : ""}`}>증명·전송</span></div>}
       {p.status === "done" && <div className="small ok">✓ 전송 완료 · 눌러서 상세</div>}
