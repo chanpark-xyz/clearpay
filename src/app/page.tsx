@@ -52,6 +52,18 @@ function Audience({ profile, to, label, compact = false }: { profile: Pick<Profi
   );
 }
 
+/** Turns raw CLI/RPC errors into a one-line Korean reason. */
+function humanError(err?: string): string {
+  const e = err ?? "";
+  if (/insufficient balance|잔액 부족/i.test(e)) { const m = e.match(/잔액 부족[^\n]*/); return m ? m[0] : "잔액 부족 — 보내는 지갑의 공개 잔액이 금액 + 가스보다 적습니다"; }
+  if (/decryption failed|wrong key/i.test(e)) return "복호화 실패 — 이 키로는 열 수 없는 증빙입니다";
+  if (/exact-match note/i.test(e)) return "출금 가능한 정확한 금액의 노트가 없습니다";
+  if (/timeout/i.test(e)) return "시간 초과 — 노드 응답이 늦었습니다";
+  if (/PolicyRejected|POLICY_REJECTED|VolumeAbove|InAddressList/i.test(e)) return "정책 거절 — 한도 또는 허용 목록에 걸렸습니다";
+  const last = e.split("\n").filter((l) => /Error|error/.test(l)).slice(-1)[0];
+  return last ? last.replace(/^Error:\s*/, "").slice(0, 160) : (e.slice(0, 160) || "알 수 없는 오류");
+}
+
 export default function Home() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [history, setHistory] = useState<unknown[]>([]);
@@ -97,7 +109,7 @@ export default function Home() {
       const r = await fetch("/api/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentId: id }) });
       const p: Payment = await r.json();
       setMsgs((m) => m.map((x) => (x.payment?.id === id ? { ...x, payment: p } : x)));
-      setMsgs((m) => [...m, { role: "assistant", content: p.status === "done" ? "보냈어요. 체인에 기록됐고 증빙은 지정한 키로만 열립니다. 오른쪽 내역을 눌러 누가 무엇을 보는지 확인해 보세요." : `실패했어요: ${(p.error ?? "").split("\n").filter((l) => /잔액|Error|error/.test(l)).slice(-1)[0] ?? p.error}` }]);
+      setMsgs((m) => [...m, { role: "assistant", content: p.status === "done" ? "보냈어요. 체인에 기록됐고 증빙은 지정한 키로만 열립니다. 오른쪽 내역을 눌러 누가 무엇을 보는지 확인해 보세요." : `실패했어요: ${humanError(p.error)}` }]);
     } finally { setBusy(false); refresh(); }
   };
   const verify = async (p: Payment, who: "public" | "designated" | "wrong") => {
@@ -172,7 +184,7 @@ export default function Home() {
               return (
                 <button key={p.id} className={`trow ${p.status}`} onClick={() => { setOpenId(p.id); setLens("public"); }}>
                   <span className="icon">{s?.icon ?? "💸"}</span>
-                  <span className="tmain"><b>{won(p.amountOkrw)}</b> <span className="muted">→ {short(p.to)}</span><div className="small muted">{p.tax?.category ?? p.kind}{p.tax?.benefitOkrw != null ? ` · 예상 공제 ${won(p.tax.benefitOkrw)}` : ""}</div></span>
+                  <span className="tmain"><b>{won(p.amountOkrw)}</b> <span className="muted">→ {short(p.to)}</span><div className="small muted">{p.status === "failed" ? <span className="bad">{humanError(p.error)}</span> : <>{p.tax?.category ?? p.kind}{p.tax?.benefitOkrw != null ? ` · 예상 공제 ${won(p.tax.benefitOkrw)}` : ""}</>}</div></span>
                   <Audience profile={p.profile} to={p.to} label={short} compact />
                   <span className={`status ${p.status}`}>{statusKo(p.status)}</span>
                 </button>
@@ -225,7 +237,7 @@ function Detail({ p, lens, setLens, checks, verify, short, onClose, onExecute, o
         </div>
         {p.tax && <div className="taxbox">{p.tax.benefitOkrw != null && <b>예상 공제 {won(p.tax.benefitOkrw)}</b>}<span className="muted small">{p.tax.note}</span></div>}
         <div className="muted small" style={{ marginTop: 6 }}>{p.profile.rationale}</div>
-        {p.status === "failed" && <div className="errbox"><b>실패 사유</b><div>{(p.error ?? "").split("\n").filter((l) => /잔액|Error|error|insufficient/.test(l)).slice(-1)[0] ?? p.error}</div><div className="muted small">체인에는 아무것도 기록되지 않았습니다 (사전 검사 또는 노드 거절).</div></div>}
+        {p.status === "failed" && <div className="errbox"><b>실패 사유</b><div>{humanError(p.error)}</div><div className="muted small">체인에는 아무것도 기록되지 않았습니다 (사전 검사 또는 노드 거절).</div></div>}
         <div className="row" style={{ marginTop: 8 }}>
           {p.txs.filter((t) => ACTION_KO[t.action]).map((t) => <a key={t.hash} href={t.explorer} target="_blank" rel="noreferrer" className="tx">{ACTION_KO[t.action]} ↗</a>)}
           {p.status === "proposed" && <button className="primary" disabled={busy} onClick={() => onExecute(p.id)}>이대로 보내기</button>}
@@ -273,7 +285,7 @@ function PayCard({ p, label, onOpen, onExecute, busy }: { p: Payment; label: (n?
       {p.status === "proposed" && <button className="primary full" disabled={busy} onClick={(e) => { e.stopPropagation(); onExecute(p.id); }}>이대로 보내기</button>}
       {p.status === "executing" && <div className="steps small"><span className={`step ${done.has("deposit") ? "ok" : "active"}`}>예치</span><span className={`step ${done.has("final_transfer") ? "ok" : done.has("deposit") ? "active" : ""}`}>증명·전송</span></div>}
       {p.status === "done" && <div className="small ok">✓ 전송 완료 · 눌러서 상세</div>}
-      {p.status === "failed" && <div className="small bad">✗ {(p.error ?? "").split("\n").filter((l) => /잔액|Error|error/.test(l)).slice(-1)[0] ?? "실패"}</div>}
+      {p.status === "failed" && <div className="small bad">✗ {humanError(p.error)}</div>}
     </div>
   );
 }
