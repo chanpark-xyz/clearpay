@@ -1,8 +1,10 @@
-# ClearPay — 세무 비서가 공개 범위를 정하는 결제 (OBA.RUN Season 2 · Maroo × SKT)
+# 모두의 송금비서 ClearPay — 세금은 챙기고, 금액은 숨기고
 
-> "이번 달 월세 50 집주인에게. 월세 세액공제 받고 싶어요."
-> → 세무 비서(SKT A.X K2)가 **세법상 분류·예상 공제·누구에게 무엇을 공개할지**를 정하고,
-> Maroo 테스트넷에서 tOKRW가 실제로 움직입니다. 국세청은 자기 키로만 영수증을 복호화합니다.
+OBA.RUN Season 2 · Maroo Verifiable Privacy × SKT A.X K2
+
+> 세금 생각만 하면 머리 아픈 보통 사람을 위해, AI가 알아서 대신 공제를 챙기고 꼭 알아야 할 상대에게만 내용을 공개하는 송금비서입니다.
+>
+> "이번 달 월세 50만 원 집주인에게. 세액공제 받고 싶어요." → 세무 비서(SKT A.X K2)가 세법 분류·예상 공제·공개 범위를 정하고, Maroo 테스트넷에서 tOKRW가 실제로 움직입니다. 국세청만 자기 키로 증빙을 엽니다.
 
 ## 문제와 답
 월세·용돈·외주비·기부·경조사비처럼 평소 보내는 돈에는 각각 세금 규칙과 "누가 알아야 하는가"가 다릅니다.
@@ -14,17 +16,29 @@ Maroo Verifiable Privacy(VP)는 거래마다 **무엇을**(금액·보내는 이
 - **국세청**: 지정 공개된 증빙만 자기 키로 복호화 → 연말정산 요약을 체인에서 복원해 생성.
 - **대중**: 체인에는 커밋먼트만. 공개로 지정한 항목(예: 축의금 명부)만 보임.
 
-## 빠른 시작 (다른 사람이 돌리기)
+## 빠른 시작 (데모 세팅)
+필요한 비밀값은 **.env.local 한 파일**에만 넣습니다. 저장소에는 올라가지 않습니다.
+
 ```bash
-# 0) 요구: macOS 26+(Apple Silicon) 또는 Linux, Node 20+, pnpm, jq, Foundry cast (brew install foundry jq)
-git clone <repo> && cd cleargive
-bash maroo/setup.sh          # marood v0.11.1 + 증명 파일(289MB) 설치, 지갑 6개 생성, 주소 출력
-#    → faucet.maroo.io 에서 tOKRW 받아 출력된 주소로 송금 (donor1 1,000 / donor2·charity·taxoffice 300 이상)
-bash maroo/setup.sh attest   # 송신 지갑 EAS attestation 등록
-cp .env.example .env.local   # LLM_API_KEY 입력 (SKT A.X K2 키. 영문 O 아님, 숫자 0)
-pnpm install && pnpm dev --port 3077     # http://localhost:3077  (같은 Wi-Fi에선 터미널에 뜨는 Network 주소로 접속)
+# 요구: macOS 26+(Apple Silicon) 또는 Linux x86-64/arm64, Node 20+, pnpm, jq, Foundry cast
+brew install foundry jq            # macOS
+git clone https://github.com/chanpark-xyz/clearpay && cd clearpay
+cp .env.example .env.local         # ① AI 키  ② (선택) 지갑 개인키  ③ VP_DIR
+bash maroo/setup.sh                # marood v0.11.1 + 증명 파일(289MB) 설치, 지갑 준비, 주소 출력
+#   → faucet.maroo.io 에서 tOKRW를 받아 donor1 주소로 2,000 이상 송금
+bash maroo/setup.sh attest         # 송신 지갑 EAS attestation 등록 (최초 1회)
+pnpm install && pnpm dev --port 3077   # http://localhost:3077
 ```
-키가 없으면 자동으로 규칙 모드로 동작합니다. `LLM_PROVIDER=codex`면 로컬 Codex CLI(구독 로그인)를 씁니다.
+
+### .env.local 구조
+| 키 | 설명 |
+|---|---|
+| `LLM_PROVIDER` / `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | AI. 기본은 SKT A.X K2(OpenAI 호환). 키가 비면 규칙 모드, `codex`면 로컬 Codex CLI |
+| `WALLET_DONOR1_KEY` … `WALLET_TAXOFFICE_KEY` | 지갑 개인키(0x…). 비우면 setup.sh가 테스트 키를 생성해 `../maroo-privacy-testnet/keys/`에 둡니다 |
+| `VP_DIR` | marood·증명 파일·키링 위치 (기본 `../maroo-privacy-testnet`) |
+
+역할: `donor1` 보내는 사람(잔액 필요) · `donor2` 집주인 · `parent` 어머니 · `freelancer` 프리랜서 · `charity` 기부단체 · `taxoffice` 국세청(증빙 복호화 키).
+키를 바꾸면 `maroo/setup.sh`를 다시 실행하면 키링에 반영됩니다. 터널로 외부에 열 때는 `cloudflared tunnel --url http://localhost:3077`.
 
 ## 데모 순서 (3분)
 1. 오른쪽 **기본 시나리오**에서 "월세"를 누른다 → 왼쪽 폰에 세무 비서의 제안 카드 (세액공제 15%, 국세청에만 👁👁👁).
@@ -53,6 +67,10 @@ pnpm install && pnpm dev --port 3077     # http://localhost:3077  (같은 Wi-Fi�
 | 축의금 (from-to public) | https://explorer-testnet.maroo.io/tx/0xc0899302ebb5fcd55eda23be018d383fb707010ef9591e8aaf0770ece3799aca |
 | 월세 (amount-from-to → 국세청) | https://explorer-testnet.maroo.io/tx/0x8260314d960029c303d5189c3dbcb641b25e1debe32a7f54ffa07f463a9faa65 |
 | 보호소 집행: 자기전송 → 공개 출금 10 | https://explorer-testnet.maroo.io/tx/0x2950b26baf02dc300e8479b669e3b1b5760edd31c2aa36c749b2eee5ae931b26 → https://explorer-testnet.maroo.io/tx/0x9d0a0905184171b1d4b08990080f71fe210a3c735a25b5fff4334c6c4dca0457 |
+
+## 비밀값 처리
+- 지갑 개인키와 AI 키는 `.env.local`(git 제외) 또는 저장소 밖 `keys/`에만 있습니다. 소스·화면·API 응답에는 주소, 잔액, 노트 합계, 복호화된 금액·당사자, tx 해시만 나갑니다.
+- 노트 원문(비밀 스칼라)은 서버에서 합계만 계산하고 브라우저로 보내지 않습니다. CLI stderr도 응답에서 제거합니다.
 
 ## 구조
 ```

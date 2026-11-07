@@ -11,6 +11,9 @@ cp "$HERE/vp.sh" "$VP_DIR/scripts/vp.sh"; chmod +x "$VP_DIR/scripts/vp.sh"
 export PATH="/opt/homebrew/bin:$HOME/.foundry/bin:$VP_DIR/bin:$PATH"
 
 step() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
+# Load cleargive/.env.local so WALLET_*_KEY (and LLM_*) are visible here.
+ENV_FILE="$(cd "$HERE/.." && pwd)/.env.local"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 
 if [ "${1:-}" = "attest" ]; then
   step "EAS attestation (needs tOKRW for gas)"
@@ -44,17 +47,19 @@ fi
 
 step "demo wallets (test-only keys in $VP_DIR/keys, never commit)"
 for n in donor1 donor2 parent freelancer charity taxoffice; do
-  if [ ! -f "$VP_DIR/keys/$n.json" ]; then cast wallet new --json > "$VP_DIR/keys/$n.json"; fi
-  K="$(jq -er '.data[0].private_key' "$VP_DIR/keys/$n.json")"
-  printf 'test-only-passphrase\n' | "$VP_DIR/bin/marood" keys unsafe-import-eth-key "$n" "${K#0x}" --keyring-backend test --home "$VP_DIR/client" >/dev/null 2>&1 || true
+  var="WALLET_$(printf '%s' "$n" | tr '[:lower:]' '[:upper:]')_KEY"
+  if [ -n "${!var:-}" ]; then echo "  $n: using $var from .env.local"; continue; fi
+  if [ ! -f "$VP_DIR/keys/$n.json" ]; then cast wallet new --json > "$VP_DIR/keys/$n.json"; echo "  $n: generated keys/$n.json"; fi
 done
+"$VP_DIR/scripts/vp.sh" import >/dev/null
 : > "$VP_DIR/ADDRESSES.txt"
 for n in donor1 donor2 parent freelancer charity taxoffice; do "$VP_DIR/scripts/vp.sh" addr "$n" | tee -a "$VP_DIR/ADDRESSES.txt"; done
 
 cat <<MSG
 
 다음 단계
-1) https://faucet.maroo.io 에서 본인 지갑으로 tOKRW를 받은 뒤 아래 주소로 보내세요 (donor1 1,000 / donor2·charity·taxoffice 각 300 이상 권장):
+1) https://faucet.maroo.io 에서 tOKRW를 받아 아래 주소로 보내세요 (donor1 2,000 이상 / donor2·charity·taxoffice 각 300 이상 권장).
+   본인 지갑을 그대로 쓰려면 .env.local 의 WALLET_DONOR1_KEY 등에 개인키를 넣고 이 스크립트를 다시 실행하세요.
 $(jq -r '"   \(.name)\t\(.evm)"' "$VP_DIR/ADDRESSES.txt")
 2) 잔액이 들어오면:  bash maroo/setup.sh attest
 3) cleargive/.env.local 에 LLM 키 입력 후:  pnpm install && pnpm dev --port 3077
