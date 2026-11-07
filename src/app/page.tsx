@@ -19,6 +19,7 @@ const TEMPLATES = [
   { id: "donation", icon: "🐶", title: "기부", msg: "유기견 보호소에 30 기부. 연말정산 영수증 필요해요", tax: "기부금 세액공제 15%", to: "charity", profile: { privacyPolicy: "amount-from-to", disclosureMode: "recipient-encrypted", disclosureTo: "taxoffice" }, match: /기부/ },
   { id: "gift", icon: "💐", title: "축의금", msg: "친구 결혼식 축의금 10 박상민에게. 누가 냈는지는 남겨도 돼", tax: "개인 간 비과세", to: "donor2", profile: { privacyPolicy: "from-to", disclosureMode: "public" }, match: /경조|축의|부의/ },
 ];
+const KIND_KO: Record<string, string> = { donation: "기부", salary: "급여·활동비", vendor: "외주·납품", gift: "경조사", other: "송금" };
 const FIELD_KO: Record<Field, string> = { amount: "금액", from: "보내는 사람", to: "받는 사람" };
 const ACTION_KO: Record<string, string> = { deposit: "공개 예치", final_transfer: "비공개 전송", withdraw: "공개 출금" };
 /** 1 tOKRW = 10,000원 (demo convention) */
