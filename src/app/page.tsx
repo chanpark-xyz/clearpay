@@ -159,7 +159,7 @@ export default function Home() {
         </div>
 
         <section className="board">
-          <div className="sechead"><h3>템플릿</h3><span className="muted small">누르면 왼쪽 입력창에 문장이 들어갑니다. 고쳐서 보내세요</span></div>
+          <div className="sechead"><h3>템플릿</h3><span className="muted small">누르면 입력창에 문장이 들어갑니다. 고쳐서 보내세요</span></div>
           <div className="scen">
             {TEMPLATES.map((s) => {
               const n = payments.filter((p) => p.status === "done" && templateOf(p)?.id === s.id).length;
@@ -184,7 +184,7 @@ export default function Home() {
               return (
                 <button key={p.id} className={`trow ${p.status}`} onClick={() => { setOpenId(p.id); setLens("public"); }}>
                   <span className="icon">{s?.icon ?? "💸"}</span>
-                  <span className="tmain"><b>{won(p.amountOkrw)}</b> <span className="muted">→ {short(p.to)}</span><div className="small muted">{p.status === "failed" ? <span className="bad">{humanError(p.error)}</span> : <>{p.tax?.category ?? p.kind}{p.tax?.benefitOkrw != null ? ` · 예상 공제 ${won(p.tax.benefitOkrw)}` : ""}</>}</div></span>
+                  <span className="tmain"><b>{won(p.amountOkrw)}</b> <span className="muted">→ {short(p.to)}</span><div className="small muted">{p.status === "failed" ? <span className="bad">{humanError(p.error)}</span> : <>{p.tax?.category ?? KIND_KO[p.kind] ?? p.kind}{p.tax?.benefitOkrw != null ? ` · 예상 공제 ${won(p.tax.benefitOkrw)}` : ""}</>}</div></span>
                   <Audience profile={p.profile} to={p.to} label={short} compact />
                   <span className={`status ${p.status}`}>{statusKo(p.status)}</span>
                 </button>
@@ -279,7 +279,7 @@ function PayCard({ p, label, onOpen, onExecute, busy }: { p: Payment; label: (n?
   const done = new Set(p.txs.map((t) => t.action));
   return (
     <div className={`paycard ${p.status}`} onClick={onOpen}>
-      <div className="row between"><span className="small muted">{p.tax?.category ?? p.kind}</span><b className="pc-amt">{won(p.amountOkrw)}</b></div>
+      <div className="row between"><span className="small muted">{p.tax?.category ?? KIND_KO[p.kind] ?? p.kind}</span><b className="pc-amt">{won(p.amountOkrw)}</b></div>
       <div className="small">{label(p.from)} → <b>{label(p.to)}</b>{p.tax?.benefitOkrw != null ? <span className="muted"> · 예상 공제 {won(p.tax.benefitOkrw)}</span> : null}</div>
       <Audience profile={p.profile} to={p.to} label={label} compact />
       {p.status === "proposed" && <button className="primary full" disabled={busy} onClick={(e) => { e.stopPropagation(); onExecute(p.id); }}>이대로 보내기</button>}
