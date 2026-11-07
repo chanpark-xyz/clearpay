@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     }),
   );
   let pool: unknown = null;
-  try { pool = await vp("pool"); } catch (e) { pool = { error: String(e) }; }
+  try { const r = await vp("pool"); delete r._log; pool = r; } catch (e) { pool = { error: String(e) }; }
   const db = await readDb();
   return NextResponse.json({ wallets, pool, payments: db.payments, provider: cfg.llmProvider });
 }

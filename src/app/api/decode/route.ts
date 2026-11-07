@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     const cosmos = String(info.cosmosHash ?? "");
     if (!cosmos) return NextResponse.json({ error: "cosmos tx hash not found", info }, { status: 404 });
     const decoded = await vp("decode", String(name), cosmos, String(plane));
+    delete decoded._log; delete info._log; // never ship CLI stderr to the browser
     return NextResponse.json({ info, decoded });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message ?? e) }, { status: 500 });
