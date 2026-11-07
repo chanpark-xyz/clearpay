@@ -7,7 +7,6 @@
 <p align="center">
   <a href="docs/demo.mp4">▶ 60초 데모 영상</a> ·
   <a href="#빠른-시작">빠른 시작</a> ·
-  <a href="#배포">배포</a> ·
   <a href="#아키텍처">아키텍처</a>
 </p>
 <p align="center">
@@ -29,7 +28,7 @@
 | 기부 | 영수증은 필요한데 이름과 금액이 공개되는 건 싫음 | 소액 기부도 망설임 |
 | 용돈·경조사비 | 신고 대상인지조차 모름 | 불필요한 걱정, 또는 기록 없음 |
 
-기존 수단에는 빈틈이 있습니다. 계좌이체는 증빙을 내려면 **거래내역서를 통째로** 내야 해 필요 이상이 드러나고, 공개 블록체인은 **전 세계에** 보이며, 프라이버시 체인은 반대로 증빙을 남길 수 없습니다.
+기존 수단에는 빈틈이 있습니다. 계좌이체는 **세금 증빙이 어렵고**, 공개 블록체인은 **전 세계에** 보이며, 프라이버시 체인은 반대로 증빙을 남길 수 없습니다.
 
 ## ClearPay가 하는 일
 
@@ -110,35 +109,16 @@ pnpm install && pnpm dev --port 3077
 
 역할: `donor1` 보내는 사람(잔액 필요) · `donor2` 집주인 · `parent` 어머니 · `freelancer` 프리랜서 · `charity` 기부단체 · `taxoffice` 국세청(증빙 복호화 키)
 
-## 배포
-
-증명은 서버에서 `marood`로 로컬 생성하므로 서버리스(Vercel 등)에서는 돌지 않습니다. Docker 이미지 하나로 어떤 무료 호스팅에도 올라갑니다.
-
-```bash
-docker build -t clearpay .                       # ubuntu 24.04 + marood + 증명 파일 + Next.js (약 1GB)
-docker run -p 3000:3000 --env-file .env.local clearpay
-```
-
-| 호스팅 | 방법 |
-|---|---|
-| **Render** (무료) | New → Web Service → 이 저장소 → Docker. 환경변수에 `.env.local` 내용 입력 |
-| **Hugging Face Spaces** (무료) | Docker Space 생성 → 저장소 push → Settings › Secrets에 환경변수 |
-| **Fly.io / Railway** | `fly launch` 또는 Railway Docker 배포. 동일 환경변수 |
-
-컨테이너는 시작 시 `WALLET_*_KEY`를 키링에 넣고, 없으면 테스트 지갑을 생성해 로그에 주소를 출력합니다(Faucet 입금 필요).
-
 ## 아키텍처
 
-```
-┌──────────────┐   한 문장    ┌──────────────────┐  JSON 결정   ┌───────────────────────┐
-│  폰형 메신저  │ ──────────▶ │ 세무 비서 (LLM)   │ ──────────▶ │ 제안 카드 · 공개 범위   │
-│  page.tsx    │             │ agent.ts          │             │ policy.ts              │
-└──────────────┘             └──────────────────┘             └───────────┬───────────┘
-                                                                          │ 이대로 보내기
-┌──────────────┐  decode     ┌──────────────────┐   prepare    ┌───────────▼───────────┐
-│ 관점별 영수증 │ ◀────────── │ maroo/vp.sh       │ ◀──────────  │ executor.ts            │
-│ 체인 검증     │             │ marood + cast     │              │ 예치 → 비공개 전송      │
-└──────────────┘             └──────────────────┘              └───────────────────────┘
+```mermaid
+flowchart LR
+  U["📱 폰형 메신저<br/>page.tsx"] -- "한 문장" --> A["🧾 세무 비서 (LLM)<br/>agent.ts"]
+  A -- "JSON 결정" --> P["제안 카드 · 공개 범위<br/>policy.ts"]
+  P -- "이대로 보내기" --> E["executor.ts<br/>예치 → 비공개 전송"]
+  E -- "prepare · send" --> V["maroo/vp.sh<br/>marood + cast"]
+  V -- "Maroo Testnet" --> C[("체인<br/>커밋먼트만")]
+  C -- "decode-disclosure" --> R["관점별 영수증<br/>체인 검증"]
 ```
 
 | 경로 | 역할 |
