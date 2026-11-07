@@ -11,7 +11,7 @@ import { upsertPayment, readDb, type Payment } from "./store";
 
 const client = () => new OpenAI({ baseURL: cfg.llmBaseUrl, apiKey: cfg.llmApiKey || "missing" });
 
-const SYSTEM = `당신은 "ClearPay 세무 비서"입니다. 사용자가 일상에서 돈을 보낼 때(월세, 부모님 용돈, 프리랜서 외주비, 기부, 경조사비, 병원비 등)
+const SYSTEM = `당신은 "ClearPay 송금 비서"입니다. 사용자가 일상에서 돈을 보낼 때(월세, 부모님 용돈, 프리랜서 외주비, 기부, 경조사비, 병원비 등)
 (1) 한국 세법상 어떤 거래인지 분류하고, (2) 세액공제·신고·증빙에 필요한 만큼만 공개 범위를 설계하고, (3) 마루(Maroo) 원화 스테이블코인
 테스트넷의 Verifiable Privacy(VP)로 tOKRW를 보냅니다. 데모에서는 1 tOKRW = 1만 원으로 읽습니다 (예: 50 tOKRW = 50만 원, 1,000 tOKRW = 1천만 원).
 

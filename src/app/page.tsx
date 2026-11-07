@@ -136,16 +136,16 @@ export default function Home() {
   return (
     <main className="wrap">
       <header className="top">
-        <div><h1>ClearPay</h1><div className="muted">세무 비서에게 말하면, 세금 증빙에 필요한 만큼만 공개하고 보냅니다</div></div>
+        <div><h1>ClearPay</h1><div className="muted">송금 비서에게 말하면, 세금 증빙에 필요한 만큼만 공개하고 보냅니다</div></div>
         <div className="row small"><span className="badge">LLM {state?.provider === "api" ? "SKT A.X K2" : state?.provider ?? "…"}</span><span className="badge">Maroo Testnet · 1 tOKRW = 1만 원</span><span className="legend">👁 보임 · 🔒 비공개</span></div>
       </header>
 
       <div className="stage">
         <div className="phone">
           <div className="notch" />
-          <div className="phead"><div className="avatar">세</div><div><b>세무 비서</b><div className="small muted">{busy === "think" ? "입력 중…" : busy === "exec" ? "체인에 보내는 중…" : "온라인"}</div></div></div>
+          <div className="phead"><div className="avatar">송</div><div><b>송금 비서</b><div className="small muted">{busy === "think" ? "입력 중…" : busy === "exec" ? "체인에 보내는 중…" : "온라인"}</div></div></div>
           <div className="plog" ref={logRef}>
-            {msgs.length === 0 && <div className="bubble assistant">안녕하세요, 세무 비서예요. 월세·용돈·외주비·기부처럼 평소 보내는 돈을 말해 주세요. 세법상 뭔지, 공제는 얼마인지, 누구에게 뭘 공개할지 정해서 보내 드릴게요.</div>}
+            {msgs.length === 0 && <div className="bubble assistant">안녕하세요, 송금 비서예요. 월세·용돈·외주비·기부처럼 평소 보내는 돈을 말해 주세요. 세금은 제가 챙기고, 누구에게 뭘 공개할지 정해서 보내 드릴게요.</div>}
             {msgs.map((m, i) => m.role === "tool"
               ? (m.payment ? <PayCard key={i} p={m.payment} label={short} onOpen={() => setOpenId(m.payment!.id)} onExecute={execute} busy={!!busy} /> : null)
               : <div key={i} className={`bubble ${m.role}`}>{m.content}</div>)}

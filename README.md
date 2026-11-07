@@ -32,7 +32,7 @@
 
 ## ClearPay가 하는 일
 
-한 문장으로 말하면, 세무 비서가 **세법 분류 → 예상 공제 → 누구에게 무엇을 공개할지**를 정하고 돈을 보냅니다.
+한 문장으로 말하면, 송금 비서가 **세법 분류 → 예상 공제 → 누구에게 무엇을 공개할지**를 정하고 돈을 보냅니다.
 
 ```
 "이번 달 월세 50만 원 집주인에게. 세액공제 받고 싶어요."
@@ -113,7 +113,7 @@ pnpm install && pnpm dev --port 3077
 
 ```mermaid
 flowchart LR
-  U["📱 폰형 메신저<br/>page.tsx"] -- "한 문장" --> A["🧾 세무 비서 (LLM)<br/>agent.ts"]
+  U["📱 폰형 메신저<br/>page.tsx"] -- "한 문장" --> A["🧾 송금 비서 (LLM)<br/>agent.ts"]
   A -- "JSON 결정" --> P["제안 카드 · 공개 범위<br/>policy.ts"]
   P -- "이대로 보내기" --> E["executor.ts<br/>예치 → 비공개 전송"]
   E -- "prepare · send" --> V["maroo/vp.sh<br/>marood + cast"]
@@ -123,7 +123,7 @@ flowchart LR
 
 | 경로 | 역할 |
 |---|---|
-| `src/lib/agent.ts` | 세무 비서. 세법 규칙(기부 15/30%, 월세 15~17%, 원천징수 3.3%, 증여 5천만, 경조사 20만)을 프롬프트에 명시. 프로바이더 `api`(A.X K2/OpenAI) · `codex` · `rules` |
+| `src/lib/agent.ts` | 송금 비서. 세법 규칙(기부 15/30%, 월세 15~17%, 원천징수 3.3%, 증여 5천만, 경조사 20만)을 프롬프트에 명시. 프로바이더 `api`(A.X K2/OpenAI) · `codex` · `rules` |
 | `src/lib/policy.ts` | `DisclosureProfile` = privacy-policy × disclosure-mode × 수신 키 |
 | `src/lib/executor.ts` | 잔액 확인 → 예치 → 비공개 전송(플래그 적용) · 출금 |
 | `src/app/api/*` | `chat` `execute` `decode` `receipt` `withdraw` `state` |

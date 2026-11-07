@@ -115,3 +115,28 @@ input { font-family: inherit; }
 .chip.on { background: var(--acc); color: #fff; }
 .scen { grid-template-columns: repeat(3, 1fr); }
 @media (min-width: 1400px) { .scen { grid-template-columns: repeat(5, 1fr); } }
+
+/* ── mobile ── */
+@media (max-width: 760px) {
+  .wrap { padding: 12px 12px 32px; }
+  .top { margin-bottom: 10px; } h1 { font-size: 22px; } .top .row { gap: 6px; } .badge { padding: 3px 8px; font-size: 12px; }
+  .stage { grid-template-columns: 1fr; gap: 14px; }
+  .phone { border: 0; border-radius: 20px; height: 68vh; min-height: 460px; position: static; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .notch { display: none; }
+  .bubble { max-width: 92%; font-size: 14px; }
+  .scen { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .scard { padding: 10px; } .scard .icon { width: 36px; height: 36px; font-size: 20px; }
+  .tpl-msg { display: none; }
+  .aud-row { font-size: 11.5px; padding: 3px 6px; }
+  .trow { grid-template-columns: 36px 1fr auto; gap: 8px; padding: 10px; }
+  .trow .aud { grid-column: 1 / -1; }
+  .trow .icon { width: 36px; height: 36px; font-size: 18px; }
+  .sechead { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 14px; }
+  .overlay { padding: 0; align-items: end; }
+  .sheet { width: 100%; max-height: 94vh; border-radius: 20px 20px 0 0; padding: 18px 16px 24px; }
+  .sh-amt { font-size: 22px; }
+  .personas { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .persona { padding: 8px 4px; } .persona .pav { width: 38px; height: 38px; font-size: 22px; }
+  .rc-v { font-size: 16px; }
+  .verify .txs { margin-left: 0; width: 100%; }
+}
