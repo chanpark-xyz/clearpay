@@ -22,6 +22,6 @@
 SKT A.X K2 API, Maroo Testnet, Maroo Verifiable Privacy (marood), Maroo EAS attestation, Foundry cast, viem, Next.js 16, TypeScript, OpenAI SDK (OpenAI 호환), Codex CLI
 
 ## 링크
-- GitHub: (push 후 입력)
+- GitHub: https://github.com/chanpark-xyz/clearpay (현재 비공개)
 - 데모: 현장 노트북 http://localhost:3077 (같은 Wi-Fi: Network 주소)
 - 거래 증거: README의 Explorer 링크 표
