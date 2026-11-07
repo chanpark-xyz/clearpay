@@ -122,6 +122,17 @@ export async function llmText(prompt: string): Promise<string | null> {
   return null;
 }
 
+/** Keeps LLM tax output sane: no "deduction" on withholding/gift/non-deductible items, never above 30% of the amount. */
+export function sanitizeTax(category: string, note: string, benefit: number | null, amount: number) {
+  const KO: Record<string, string> = { donation: "지정기부금", salary: "급여", vendor: "사업소득 (원천징수 3.3%)", gift: "경조사비 (개인 간 비과세)", other: "해당 없음" };
+  const cat = KO[category.toLowerCase()] ?? category;
+  let b = benefit;
+  if (/원천징수|사업소득|증여|비과세|경조사|해당 없음|급여/.test(cat)) b = null;
+  if (b != null && (!isFinite(b) || b <= 0)) b = null;
+  if (b != null && b > amount * 0.3) b = Math.round(amount * 0.15 * 100) / 100;
+  return { category: cat, note, benefitOkrw: b };
+}
+
 export type AgentEvent = { role: "assistant" | "tool"; content: string; name?: string; payment?: Payment };
 
 async function execTool(name: string, args: Record<string, unknown>, executor: (p: Payment) => Promise<Payment>) {
@@ -139,7 +150,7 @@ async function execTool(name: string, args: Record<string, unknown>, executor: (
       from: String(args.from), to: String(args.to),
       amountOkrw: Number(args.amountOkrw), memo: String(args.memo ?? ""),
       profile, status: "proposed", txs: [],
-      tax: args.taxCategory ? { category: String(args.taxCategory), note: String(args.taxNote ?? ""), benefitOkrw: args.taxBenefitOkrw == null ? null : Number(args.taxBenefitOkrw) } : undefined,
+      tax: args.taxCategory ? sanitizeTax(String(args.taxCategory), String(args.taxNote ?? ""), args.taxBenefitOkrw == null ? null : Number(args.taxBenefitOkrw), Number(args.amountOkrw)) : undefined,
     };
     await upsertPayment(p);
     return { result: { paymentId: p.id, preview: visibility(profile), payment: p }, payment: p };
