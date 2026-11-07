@@ -24,5 +24,5 @@ SKT A.X K2 API, Maroo Testnet, Maroo Verifiable Privacy (marood), Maroo EAS atte
 ## 링크
 - GitHub: https://github.com/chanpark-xyz/clearpay
 - 데모 영상(60초): https://github.com/chanpark-xyz/clearpay/blob/main/docs/demo.mp4 (README 상단 GIF로도 재생)
-- 온라인 데모: Docker 이미지 배포 후 URL 기입 (Render/Hugging Face Spaces 무료 플랜, README '배포' 참고)
+- 온라인 데모: https://suppose-toys-showtimes-minutes.trycloudflare.com (노트북 cloudflared 터널, 행사 중 유지)
 - 온체인 거래 증거: README '데모' 표의 Explorer 링크 (Maroo Testnet 450815)
