@@ -1,97 +1,162 @@
-# 모두의 송금비서 ClearPay — 세금은 챙기고, 금액은 숨기고
+<p align="center">
+  <img src="docs/demo.gif" alt="ClearPay demo" width="900" />
+</p>
 
-OBA.RUN Season 2 · Maroo Verifiable Privacy × SKT A.X K2
+<h1 align="center">ClearPay</h1>
+<p align="center"><b>세금은 챙기고, 금액은 숨기고.</b><br/>세금 생각만 하면 머리 아픈 보통 사람을 위해, AI가 알아서 공제를 챙기고 꼭 알아야 할 상대에게만 내용을 공개하는 송금비서</p>
+<p align="center">
+  <a href="docs/demo.mp4">▶ 60초 데모 영상</a> ·
+  <a href="#빠른-시작">빠른 시작</a> ·
+  <a href="#배포">배포</a> ·
+  <a href="#아키텍처">아키텍처</a>
+</p>
+<p align="center">
+  <img alt="Maroo Testnet" src="https://img.shields.io/badge/Maroo-Verifiable%20Privacy-1f6f43" />
+  <img alt="SKT A.X K2" src="https://img.shields.io/badge/LLM-SKT%20A.X%20K2-3182f6" />
+  <img alt="OBA.RUN S2" src="https://img.shields.io/badge/OBA.RUN-Season%202-191f28" />
+</p>
 
-> 세금 생각만 하면 머리 아픈 보통 사람을 위해, AI가 알아서 대신 공제를 챙기고 꼭 알아야 할 상대에게만 내용을 공개하는 송금비서입니다.
->
-> "이번 달 월세 50만 원 집주인에게. 세액공제 받고 싶어요." → 세무 비서(SKT A.X K2)가 세법 분류·예상 공제·공개 범위를 정하고, Maroo 테스트넷에서 tOKRW가 실제로 움직입니다. 국세청만 자기 키로 증빙을 엽니다.
+---
 
-## 문제와 답
-월세·용돈·외주비·기부·경조사비처럼 평소 보내는 돈에는 각각 세금 규칙과 "누가 알아야 하는가"가 다릅니다.
-Maroo Verifiable Privacy(VP)는 거래마다 **무엇을**(금액·보내는 이·받는 이) **누구에게**(아무도·누구나·지정 키) 공개할지 고를 수 있지만,
-8×3 조합을 일반 사용자가 고를 수는 없습니다. ClearPay는 LLM이 그 다이얼을 세법에 맞게 돌리고, 실행 전에 "누가 무엇을 보는지"를 보여 줍니다.
+## 누구의 어떤 문제인가
 
-- **나**: 한 문장으로 보냄. 세법 분류와 예상 공제액을 바로 봄.
-- **받는 쪽**: 자기 지갑에서 금액 확인. 그 외 정보 노출 없음.
-- **국세청**: 지정 공개된 증빙만 자기 키로 복호화 → 연말정산 요약을 체인에서 복원해 생성.
-- **대중**: 체인에는 커밋먼트만. 공개로 지정한 항목(예: 축의금 명부)만 보임.
+월세를 내고, 어머니께 용돈을 보내고, 프리랜서에게 외주비를 주고, 보호소에 기부합니다. 전부 평범한 송금인데 **세금은 하나도 평범하지 않습니다.**
 
-## 빠른 시작 (데모 세팅)
-필요한 비밀값은 **.env.local 한 파일**에만 넣습니다. 저장소에는 올라가지 않습니다.
+| 보내는 돈 | 보통 사람이 막히는 지점 | 그래서 생기는 일 |
+|---|---|---|
+| 월세 | 세액공제가 되는 건 알지만 증빙을 어떻게 남기는지 모름 | 공제를 놓치거나, 집주인 소득이 드러나 현금을 요구받음 |
+| 외주비 | 3.3%를 떼야 한다는데 얼마를 보내야 하는지 헷갈림 | 지급명세서 누락, 단가가 거래처·경쟁사에 노출 |
+| 기부 | 영수증은 필요한데 이름과 금액이 공개되는 건 싫음 | 소액 기부도 망설임 |
+| 용돈·경조사비 | 신고 대상인지조차 모름 | 불필요한 걱정, 또는 기록 없음 |
+
+기존 수단은 둘 중 하나입니다. 계좌이체는 상대에게 **전부** 보이고, 블록체인은 **전 세계에** 보입니다. 프라이버시 체인은 반대로 증빙을 남길 수 없습니다.
+
+## ClearPay가 하는 일
+
+한 문장으로 말하면, 세무 비서가 **세법 분류 → 예상 공제 → 누구에게 무엇을 공개할지**를 정하고 돈을 보냅니다.
+
+```
+"이번 달 월세 50만 원 집주인에게. 세액공제 받고 싶어요."
+
+  세법      월세 세액공제 15~17% · 예상 공제 75,000원
+  공개 범위  국세청 ─ 금액·보내는 사람·받는 사람  (지정 키로만 복호화)
+            집주인 ─ 금액
+            대중   ─ 없음  (체인에는 커밋먼트만)
+  실행      Maroo 테스트넷 예치 → 비공개 전송 (Groth16 증명, 10~25초)
+```
+
+| 사용자 | 얻는 것 |
+|---|---|
+| **보내는 사람** | 세법을 몰라도 공제를 챙기고, 내 송금 내역은 꼭 필요한 상대만 봄 |
+| **받는 사람** (집주인·프리랜서·단체) | 자기 몫의 금액만 확인. 보낸 사람의 다른 정보는 받지 않음 |
+| **국세청·세무대리인** | PDF 대신 체인에서 자기 키로 복호화한 위조 불가능한 증빙. 연말정산 요약 자동 생성 |
+| **대중** | 단체의 집행(공개 출금)만 추적 가능. 개인 거래는 보이지 않음 |
+
+## 왜 Maroo Verifiable Privacy인가
+
+Maroo VP는 거래마다 두 개의 다이얼을 제공합니다. ClearPay는 이 다이얼을 사람이 아니라 AI가 돌리게 합니다.
+
+| 다이얼 | 값 | 뜻 |
+|---|---|---|
+| `privacy-policy` | all-private · amount · to · amount-to · from · amount-from · from-to · amount-from-to | 공개 payload에 **무엇을** 담을지 |
+| `disclosure-mode` | none · public · recipient-encrypted | 그 payload를 **누가** 읽을지 (아무도 · 누구나 · 지정 공개키 보유자만) |
+
+체인 자체에는 금액·보내는 사람·받는 사람이 **절대** 기록되지 않습니다. 노트(UTXO) 커밋먼트와 널리파이어만 남고, 선택한 필드가 선택한 상대에게만 열립니다. 테스트넷에서 확인한 동작:
+
+- 국세청 키로 `decode-disclosure` → 금액·당사자 복원 ✅ · 제3자 키 → `decryption failed` ✅
+- `public` 모드 payload는 키 없이 누구나 디코드 ✅ (축의금 명부)
+- 출금은 정확히 일치하는 노트가 필요(거스름돈 없음) → 자기전송으로 노트를 만든 뒤 출금(자동 처리)
+- 증명 시간: 예치 0.2s · 전송 0.5s (Apple M-series, 로컬 증명)
+
+## 데모 (60초)
+
+<a href="docs/demo.mp4"><img src="docs/demo.gif" width="720" alt="demo" /></a>
+
+1. 템플릿 **월세** → 입력창에 문장 → 전송. A.X K2가 2초 안에 제안 카드를 만듭니다.
+2. **이대로 보내기** → 예치·증명·비공개 전송. Explorer 링크가 붙습니다.
+3. 내역 클릭 → **대중 / 집주인 / 국세청 / 나** 입장별 영수증. 국세청 키로 체인에서 복원, 다른 키로는 거부.
+4. **증빙 요약 생성** → 국세청이 체인에서 복원한 값으로 연말정산 공제액을 계산.
+
+온체인 증거 (Maroo Testnet, chain 450815):
+
+| 장면 | 거래 |
+|---|---|
+| 기부 30 · 국세청 지정 공개 | [예치](https://explorer-testnet.maroo.io/tx/0x8c8826b614841bef8c5c5211cb741b5dceb5f7b69dde710880723e8c0b7fb3fc) → [비공개 전송](https://explorer-testnet.maroo.io/tx/0x948a8212eb4239131fe6c257a2b466979104ce49adde656b609369fd2546298d) |
+| 월세 50 · 국세청 지정 공개 | [비공개 전송](https://explorer-testnet.maroo.io/tx/0x8260314d960029c303d5189c3dbcb641b25e1debe32a7f54ffa07f463a9faa65) |
+| 축의금 50 · 명부 공개(from-to public) | [비공개 전송](https://explorer-testnet.maroo.io/tx/0xc0899302ebb5fcd55eda23be018d383fb707010ef9591e8aaf0770ece3799aca) |
+| 금액 공개(amount-to public) | [비공개 전송](https://explorer-testnet.maroo.io/tx/0xc791d87d313130c6f4c4ab050451870a2fafd24ba23ae67c9767b2d93e248832) |
+| 단체 집행 · 공개 출금 10 | [자기전송](https://explorer-testnet.maroo.io/tx/0x2950b26baf02dc300e8479b669e3b1b5760edd31c2aa36c749b2eee5ae931b26) → [출금](https://explorer-testnet.maroo.io/tx/0x9d0a0905184171b1d4b08990080f71fe210a3c735a25b5fff4334c6c4dca0457) |
+
+## 빠른 시작
 
 ```bash
-# 요구: macOS 26+(Apple Silicon) 또는 Linux x86-64/arm64, Node 20+, pnpm, jq, Foundry cast
-brew install foundry jq            # macOS
+# macOS 26+ (Apple Silicon) 또는 Linux x86-64/arm64 · Node 20+ · pnpm · jq · Foundry cast
+brew install foundry jq
 git clone https://github.com/chanpark-xyz/clearpay && cd clearpay
-cp .env.example .env.local         # ① AI 키  ② (선택) 지갑 개인키  ③ VP_DIR
-bash maroo/setup.sh                # marood v0.11.1 + 증명 파일(289MB) 설치, 지갑 준비, 주소 출력
-#   → faucet.maroo.io 에서 tOKRW를 받아 donor1 주소로 2,000 이상 송금
-bash maroo/setup.sh attest         # 송신 지갑 EAS attestation 등록 (최초 1회)
-pnpm install && pnpm dev --port 3077   # http://localhost:3077
+cp .env.example .env.local        # LLM_API_KEY, (선택) WALLET_*_KEY
+bash maroo/setup.sh               # marood v0.11.1 + 증명 파일 설치, 지갑 준비, 주소 출력
+#   faucet.maroo.io → donor1 주소로 2,000 tOKRW 이상
+bash maroo/setup.sh attest        # 송신 지갑 EAS attestation (최초 1회)
+pnpm install && pnpm dev --port 3077
 ```
 
-### .env.local 구조
+### 설정 (`.env.local`)
+
 | 키 | 설명 |
 |---|---|
-| `LLM_PROVIDER` / `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | AI. 기본은 SKT A.X K2(OpenAI 호환). 키가 비면 규칙 모드, `codex`면 로컬 Codex CLI |
-| `WALLET_DONOR1_KEY` … `WALLET_TAXOFFICE_KEY` | 지갑 개인키(0x…). 비우면 setup.sh가 테스트 키를 생성해 `../maroo-privacy-testnet/keys/`에 둡니다 |
+| `LLM_PROVIDER` `LLM_BASE_URL` `LLM_MODEL` `LLM_API_KEY` | AI. 기본 SKT A.X K2(OpenAI 호환 JSON 모드). 키가 비면 규칙 모드, `codex`면 로컬 Codex CLI |
+| `WALLET_DONOR1_KEY` … `WALLET_TAXOFFICE_KEY` | 지갑 개인키(0x…). 비우면 setup.sh가 테스트 키를 생성해 저장소 밖에 둠 |
 | `VP_DIR` | marood·증명 파일·키링 위치 (기본 `../maroo-privacy-testnet`) |
 
-역할: `donor1` 보내는 사람(잔액 필요) · `donor2` 집주인 · `parent` 어머니 · `freelancer` 프리랜서 · `charity` 기부단체 · `taxoffice` 국세청(증빙 복호화 키).
-키를 바꾸면 `maroo/setup.sh`를 다시 실행하면 키링에 반영됩니다. 터널로 외부에 열 때는 `cloudflared tunnel --url http://localhost:3077`.
+역할: `donor1` 보내는 사람(잔액 필요) · `donor2` 집주인 · `parent` 어머니 · `freelancer` 프리랜서 · `charity` 기부단체 · `taxoffice` 국세청(증빙 복호화 키)
 
-## 데모 순서 (3분)
-1. 오른쪽 **기본 시나리오**에서 "월세"를 누른다 → 왼쪽 폰에 세무 비서의 제안 카드 (세액공제 15%, 국세청에만 👁👁👁).
-2. "이대로 보내기" → 예치·증명·비공개 전송 단계가 진행되고 Explorer 링크가 붙는다 (약 20초).
-3. **누가 무엇을 보나**에서 인물을 바꿔 본다: 대중은 🔒🔒🔒, 집주인은 금액만, 국세청은 전부. "국세청 입장에서 체인 검증"을 누르면 실제로 복호화된 값이 나오고, "다른 사람 키로 시도"는 거부된다.
-4. "축의금"을 보내면 대중에게 보내는 이·받는 이만 공개되고 금액은 숨는다 (명부).
-5. **국세청 · 연말정산**에서 "증빙 요약 생성" → 체인에서 복원한 금액으로 공제액 계산.
+## 배포
 
-## 테스트넷에서 검증한 VP 동작 (2026-11-07)
-| 항목 | 확인 결과 |
-|---|---|
-| 모델 | **UTXO(노트)**. 예치는 공개 tx, 풀 안 전송은 Groth16 증명(join-split 2x2), 출금은 공개 tx |
-| 체인에 보이는 것 | 커밋먼트·널리파이어뿐. 금액·보내는 이·받는 이는 **항상** 비공개 |
-| `--privacy-policy` | 공개 payload에 담을 필드 선택 (all-private / amount / to / amount-to / from / …) |
-| `--disclosure-mode` | 그 payload를 누가 읽는가: `none` / `public`(키 없이 디코드) / `recipient-encrypted`(지정 공개키 보유자만) |
-| 지정 공개 검증 | 국세청 키로 `decode-disclosure` → 금액·당사자 복원 ✅ / 다른 지갑 키 → `decryption failed` ✅ |
-| 출금 제약 | 정확히 일치하는 노트 1개 필요(거스름돈 없음) → 자기 자신에게 비공개 전송으로 노트를 만든 뒤 출금(자동) |
-| 증명 시간 | 예치 0.2s, 전송 0.5s (M-series Mac, 로컬 증명). 한 건 실행 7~25초 |
+증명은 서버에서 `marood`로 로컬 생성하므로 서버리스(Vercel 등)에서는 돌지 않습니다. Docker 이미지 하나로 어떤 무료 호스팅에도 올라갑니다.
 
-### 실제 거래 (Maroo Testnet, chain 450815)
-| 단계 | tx |
-|---|---|
-| EAS attestation ×4 | `0x9fdbb2d4…96e5` `0x876256e9…908b` `0x4df81c39…e399` `0x5ffa8d60…0984` |
-| 기부: 예치 30 → 비공개 전송 (국세청 지정 공개) | https://explorer-testnet.maroo.io/tx/0x8c8826b614841bef8c5c5211cb741b5dceb5f7b69dde710880723e8c0b7fb3fc → https://explorer-testnet.maroo.io/tx/0x948a8212eb4239131fe6c257a2b466979104ce49adde656b609369fd2546298d |
-| 공개 모드 전송 (amount-to public) | https://explorer-testnet.maroo.io/tx/0xc791d87d313130c6f4c4ab050451870a2fafd24ba23ae67c9767b2d93e248832 |
-| 축의금 (from-to public) | https://explorer-testnet.maroo.io/tx/0xc0899302ebb5fcd55eda23be018d383fb707010ef9591e8aaf0770ece3799aca |
-| 월세 (amount-from-to → 국세청) | https://explorer-testnet.maroo.io/tx/0x8260314d960029c303d5189c3dbcb641b25e1debe32a7f54ffa07f463a9faa65 |
-| 보호소 집행: 자기전송 → 공개 출금 10 | https://explorer-testnet.maroo.io/tx/0x2950b26baf02dc300e8479b669e3b1b5760edd31c2aa36c749b2eee5ae931b26 → https://explorer-testnet.maroo.io/tx/0x9d0a0905184171b1d4b08990080f71fe210a3c735a25b5fff4334c6c4dca0457 |
-
-## 비밀값 처리
-- 지갑 개인키와 AI 키는 `.env.local`(git 제외) 또는 저장소 밖 `keys/`에만 있습니다. 소스·화면·API 응답에는 주소, 잔액, 노트 합계, 복호화된 금액·당사자, tx 해시만 나갑니다.
-- 노트 원문(비밀 스칼라)은 서버에서 합계만 계산하고 브라우저로 보내지 않습니다. CLI stderr도 응답에서 제거합니다.
-
-## 구조
-```
-src/lib/agent.ts     세무 비서. LLM 3종: api(JSON 모드, A.X K2/OpenAI) · codex(로컬 Codex CLI) · rules(폴백)
-                     세법 규칙(기부 15%/30%, 월세 15~17%, 원천징수 3.3%, 증여 5천만, 경조사 20만)을 프롬프트에 명시
-src/lib/policy.ts    DisclosureProfile(privacyPolicy, disclosureMode, disclosureTo)
-src/lib/executor.ts  잔액 확인 → 예치 → 비공개 전송(정책 플래그) / 출금
-src/lib/vp.ts        maroo/vp.sh 호출 래퍼
-src/app/api/*        state · chat · execute · withdraw · decode · receipt
-src/app/page.tsx     폰 메신저 + 시나리오 카드 + 처리 내역 + 인물별 영수증 뷰 + 연말정산 요약
-maroo/vp.sh          marood v0.11.1 + cast 래퍼 (addr balance pool attest deposit transfer withdraw notes dpubkey decode txinfo)
-maroo/setup.sh       새 머신 세팅 (도구·지갑·EAS)
+```bash
+docker build -t clearpay .                       # ubuntu 24.04 + marood + 증명 파일 + Next.js (약 1GB)
+docker run -p 3000:3000 --env-file .env.local clearpay
 ```
 
-## 심사 질문에 대한 답
-- **누구의 어떤 일이 쉬워졌나**: 납세자는 세법과 프라이버시 설정을 몰라도 한 문장으로 보내고, 국세청은 서류 없이 자기 키로 증빙을 열며, 거래 상대나 대중에게는 필요한 것만 보인다.
-- **선택 기능**: Verifiable Privacy — 비공개 전송 + privacy-policy × disclosure-mode + 공개/지정 플레인 복호화 + 공개 출금. 실제 tOKRW 거래 10건 이상.
-- **SKT**: 사용자 요청 → 세법 분류·공개 범위 설계(Action) → 결제(Pay). A.X K2는 OpenAI 호환 JSON 모드로 2초 내 응답.
+| 호스팅 | 방법 |
+|---|---|
+| **Render** (무료) | New → Web Service → 이 저장소 → Docker. 환경변수에 `.env.local` 내용 입력 |
+| **Hugging Face Spaces** (무료) | Docker Space 생성 → 저장소 push → Settings › Secrets에 환경변수 |
+| **Fly.io / Railway** | `fly launch` 또는 Railway Docker 배포. 동일 환경변수 |
 
-## 솔직한 한계
-- 지갑 키는 서버의 테스트 키. 실서비스는 EIP-712 `*WithAuthorization` 릴레이로 사용자 서명을 받아야 한다.
-- 수취 총액의 온체인 합계 증명은 없다 (수취 지갑 노트 합 + 공개 출금으로 확인).
-- 감사 키(audit plane) 복호화는 체인 감사 키 파일이 없어 시연하지 않았다.
-- 세액공제 숫자는 데모용 단순화(총급여 구간·한도 생략).
+컨테이너는 시작 시 `WALLET_*_KEY`를 키링에 넣고, 없으면 테스트 지갑을 생성해 로그에 주소를 출력합니다(Faucet 입금 필요).
+
+## 아키텍처
+
+```
+┌──────────────┐   한 문장    ┌──────────────────┐  JSON 결정   ┌───────────────────────┐
+│  폰형 메신저  │ ──────────▶ │ 세무 비서 (LLM)   │ ──────────▶ │ 제안 카드 · 공개 범위   │
+│  page.tsx    │             │ agent.ts          │             │ policy.ts              │
+└──────────────┘             └──────────────────┘             └───────────┬───────────┘
+                                                                          │ 이대로 보내기
+┌──────────────┐  decode     ┌──────────────────┐   prepare    ┌───────────▼───────────┐
+│ 관점별 영수증 │ ◀────────── │ maroo/vp.sh       │ ◀──────────  │ executor.ts            │
+│ 체인 검증     │             │ marood + cast     │              │ 예치 → 비공개 전송      │
+└──────────────┘             └──────────────────┘              └───────────────────────┘
+```
+
+| 경로 | 역할 |
+|---|---|
+| `src/lib/agent.ts` | 세무 비서. 세법 규칙(기부 15/30%, 월세 15~17%, 원천징수 3.3%, 증여 5천만, 경조사 20만)을 프롬프트에 명시. 프로바이더 `api`(A.X K2/OpenAI) · `codex` · `rules` |
+| `src/lib/policy.ts` | `DisclosureProfile` = privacy-policy × disclosure-mode × 수신 키 |
+| `src/lib/executor.ts` | 잔액 확인 → 예치 → 비공개 전송(플래그 적용) · 출금 |
+| `src/app/api/*` | `chat` `execute` `decode` `receipt` `withdraw` `state` |
+| `maroo/vp.sh` | marood v0.11.1 래퍼: `addr balance pool attest deposit transfer withdraw notes dpubkey decode txinfo import` |
+| `maroo/setup.sh` | 새 머신 세팅 (도구·지갑·EAS) |
+
+### 보안 원칙
+- 개인키와 AI 키는 `.env.local`(git 제외) 또는 저장소 밖 키링에만 존재합니다.
+- 브라우저로 나가는 것은 주소·잔액·노트 합계·복호화된 필드·tx 해시뿐입니다. 노트 원문과 CLI 로그는 서버 밖으로 나가지 않습니다.
+- 실서비스에서는 서버 서명 대신 EIP-712 `*WithAuthorization` 릴레이로 사용자 서명을 받습니다.
+
+## 기술 스택
+SKT A.X K2 API · Maroo Testnet · Maroo Verifiable Privacy (marood) · Maroo EAS · Foundry cast · viem · Next.js 16 · TypeScript · OpenAI SDK
+
+---
+<p align="center">OBA.RUN Season 2 · 2026-11-07 · Hashed Lounge</p>

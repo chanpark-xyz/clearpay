@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+data
+.env*
+!.env.example
+docs/*.mp4
+docs/*.webm

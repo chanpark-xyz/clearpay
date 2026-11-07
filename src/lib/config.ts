@@ -1,3 +1,4 @@
+import path from "node:path";
 export const cfg = {
   /** "api" (OpenAI-compatible HTTP) | "codex" (local Codex CLI, ChatGPT subscription auth) | "rules" */
   llmProvider: process.env.LLM_PROVIDER ?? (process.env.LLM_API_KEY ? "api" : "rules"),
@@ -5,7 +6,7 @@ export const cfg = {
   llmBaseUrl: process.env.LLM_BASE_URL ?? "https://api.openai.com/v1",
   llmModel: process.env.LLM_MODEL ?? "gpt-5.2",
   llmApiKey: process.env.LLM_API_KEY ?? "",
-  vpDir: require("node:path").resolve(process.cwd(), process.env.VP_DIR ?? "../maroo-privacy-testnet"),
+  vpDir: path.resolve(process.cwd(), process.env.VP_DIR ?? "../maroo-privacy-testnet"),
   explorer: "https://explorer-testnet.maroo.io",
 };
 
