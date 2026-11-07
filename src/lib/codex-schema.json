@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": { "type": "string", "enum": ["reply", "propose", "execute"] },
+    "reply": { "type": "string", "description": "사용자에게 보여줄 한국어 답변 (2~4문장)" },
+    "paymentId": { "type": ["string", "null"], "description": "action=execute 일 때 실행할 제안 id" },
+    "proposal": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["donation", "salary", "vendor", "gift", "other"] },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "amountOkrw": { "type": "number" },
+        "memo": { "type": "string" },
+        "privacyPolicy": { "type": "string", "enum": ["all-private", "amount", "to", "amount-to", "from", "amount-from", "from-to", "amount-from-to"] },
+        "disclosureMode": { "type": "string", "enum": ["none", "public", "recipient-encrypted"] },
+        "disclosureTo": { "type": ["string", "null"] },
+        "rationale": { "type": "string" },
+        "taxCategory": { "type": "string", "description": "세법상 분류. 예: 지정기부금, 월세 세액공제, 사업소득(원천징수 3.3%), 증여(비과세 생활비), 접대비/경조사비, 해당 없음" },
+        "taxNote": { "type": "string", "description": "증빙 요건과 공제/신고 포인트 한두 문장" },
+        "taxBenefitOkrw": { "type": ["number", "null"], "description": "예상 세액공제·절세액(tOKRW). 없으면 null" }
+      },
+      "required": ["kind", "from", "to", "amountOkrw", "memo", "privacyPolicy", "disclosureMode", "disclosureTo", "rationale", "taxCategory", "taxNote", "taxBenefitOkrw"]
+    }
+  },
+  "required": ["action", "reply", "paymentId", "proposal"]
+}

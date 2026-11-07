@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "next": "16.4.5",
+    "openai": "^7.53.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "viem": "^2.57.16"
   },
   "devDependencies": {
     "@types/node": "^20",

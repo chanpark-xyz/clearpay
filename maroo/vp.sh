@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Maroo Verifiable Privacy helper. Usage:
+#   vp.sh addr <name>                          -> {evm,bech32,shielded}
+#   vp.sh balance <name|0xaddr>                -> atokrw
+#   vp.sh attest <name>                        -> EAS attestation receipt (once per wallet)
+#   vp.sh deposit <name> <atokrw>              -> deposit public tOKRW into shielded pool
+#   vp.sh transfer <from> <to_shielded> <atokrw> [privacy-policy] [disclosure-mode] [disclosure-pubkey]
+#   vp.sh withdraw <name> <atokrw> <recipient0x>
+#   vp.sh pool                                 -> treeState + reserve
+# Last line of stdout is always a JSON object.
+set -euo pipefail
+export PATH="/opt/homebrew/bin:$PATH"
+VP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+export PATH="$VP_DIR/bin:$PATH"
+VP_CLIENT_HOME="$VP_DIR/client"
+VP_ARTIFACT_DIR="$VP_DIR/artifacts/maroo-v0.11-privacy-artifacts/artifacts"
+VP_NODE=https://comet-rpc.maroo-testnet.delightlabs.sh
+VP_RPC=https://rpc-testnet.maroo.io
+VP_CHAIN_ID=maroo-testnet-1
+VP_EVM_CHAIN_ID=450815
+VP_DENOM=atokrw
+VP_PRIVACY=0x100000000000000000000000000000000000000b
+VP_EAS=0x1000000000000000000000000000000000000007
+VP_EAS_INDEXER=0x1000000000000000000000000000000000000008
+VP_EAS_SCHEMA=0x3e448d939524a8f3e6a403502e57ce60ee10146292114a58f4bfd1b1d35f527d
+VP_ZERO32=0x0000000000000000000000000000000000000000000000000000000000000000
+mkdir -p "$VP_DIR/calls" "$VP_DIR/eas"
+
+key_of() { jq -er '.data[0].private_key' "$VP_DIR/keys/$1.json"; }
+addr_of() { cast wallet address --private-key "$(key_of "$1")"; }
+log() { echo "[vp] $*" >&2; }
+
+cmd_addr() {
+  local n="$1"
+  local evm bech shielded
+  evm="$(addr_of "$n")"
+  bech="$(marood keys show "$n" -a --keyring-backend test --home "$VP_CLIENT_HOME")"
+  shielded="$(marood tx privacy show-address --from "$n" --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --output json 2>/dev/null | jq -r .address)"
+  jq -cn --arg n "$n" --arg evm "$evm" --arg bech "$bech" --arg sh "$shielded" '{name:$n,evm:$evm,bech32:$bech,shielded:$sh}'
+}
+
+cmd_balance() {
+  local a="$1"
+  [[ "$a" == 0x* ]] || a="$(addr_of "$a")"
+  local b; b="$(cast balance "$a" --rpc-url "$VP_RPC")"
+  jq -cn --arg a "$a" --arg b "$b" '{address:$a,atokrw:$b}'
+}
+
+cmd_pool() {
+  local ts rs
+  ts="$(cast call "$VP_PRIVACY" 'treeState()((bytes32,uint64,uint32,bool,uint64,uint64))' --rpc-url "$VP_RPC" --json)"
+  rs="$(curl -fsS https://api-testnet.maroo.io/clairveil/privacy/v1/reserve/atokrw)"
+  jq -cn --argjson ts "$ts" --argjson rs "$rs" '{tree:$ts,reserve:$rs}'
+}
+
+cmd_attest() {
+  local n="$1" key addr hash data req gas receipt count
+  key="$(key_of "$n")"; addr="$(addr_of "$n" | tr '[:upper:]' '[:lower:]')"
+  receipt="$VP_DIR/eas/$n-receipt.json"
+  count="$(cast call "$VP_EAS_INDEXER" 'getReceivedAttestationUIDCount(address,bytes32)(uint256)' "$addr" "$VP_EAS_SCHEMA" --rpc-url "$VP_RPC")"
+  if [ "$count" != "0" ]; then jq -cn --arg n "$n" '{name:$n,already:true}'; return; fi
+  hash="$(cast keccak "cleargive:test-only:$addr")"
+  data="$(cast abi-encode 'f(bytes32,uint8)' "$hash" 1)"
+  req="($VP_EAS_SCHEMA,($addr,0,true,$VP_ZERO32,$data,0))"
+  local sig='attest((bytes32,(address,uint64,bool,bytes32,bytes,uint256)))(bytes32)'
+  gas="$(cast estimate "$VP_EAS" "$sig" "$req" --from "$addr" --rpc-url "$VP_RPC")"
+  cast send "$VP_EAS" "$sig" "$req" --private-key "$key" --chain "$VP_EVM_CHAIN_ID" \
+    --gas-limit "$(( (gas * 125 + 99) / 100 ))" --confirmations 2 --rpc-url "$VP_RPC" --json > "$receipt"
+  jq -c '{name:"'"$n"'",status,transactionHash}' "$receipt"
+}
+
+prepare() { # <file> <from> <action...>
+  local name="$1" from="$2"; shift 2
+  local file="$VP_DIR/calls/$name.json"
+  marood tx privacy prepare "$@" --from "$from" \
+    --home "$VP_CLIENT_HOME" --keyring-backend test --chain-id "$VP_CHAIN_ID" \
+    --node "$VP_NODE" --evm-rpc "$VP_RPC" --evm-chain-id "$VP_EVM_CHAIN_ID" \
+    --zk-artifact-dir "$VP_ARTIFACT_DIR" --timeout 10m \
+    --output-document "$file" >&2
+  echo "$file"
+}
+
+send_call() { # <file> <from> <event-sig>
+  local file="$1" from="$2" event="$3"
+  local key sender data value gas receipt topic mined
+  key="$(key_of "$from")"; sender="$(addr_of "$from")"
+  receipt="${file%.json}-receipt.json"
+  jq -e --arg sender "$sender" --arg to "$VP_PRIVACY" \
+    '(.intended_sender|ascii_downcase) == ($sender|ascii_downcase) and (.transaction.to|ascii_downcase) == $to' "$file" >/dev/null
+  data="$(jq -r .transaction.data "$file")"
+  value="$(cast to-dec "$(jq -r .transaction.value "$file")")"
+  gas="$(cast estimate "$VP_PRIVACY" "$data" --value "$value" --from "$sender" --rpc-url "$VP_RPC")"
+  cast send "$VP_PRIVACY" "$data" --value "$value" --private-key "$key" --chain "$VP_EVM_CHAIN_ID" \
+    --gas-limit "$(( (gas * 125 + 99) / 100 ))" --confirmations 2 --rpc-url "$VP_RPC" --json > "$receipt"
+  topic="$(cast sig-event "$event")"
+  jq -e --arg to "$VP_PRIVACY" --arg topic "$topic" \
+    '.status == "0x1" and any(.logs[]; (.address|ascii_downcase) == $to and .topics[0] == $topic)' "$receipt" >/dev/null
+  mined="$(cast to-dec "$(jq -r .blockNumber "$receipt")")"
+  for _ in $(seq 1 60); do
+    local eh ch
+    eh="$(cast block-number --rpc-url "$VP_RPC")"
+    ch="$(marood status --node "$VP_NODE" --home "$VP_CLIENT_HOME" --output json | jq -er .sync_info.latest_block_height)"
+    if [ "$eh" -gt "$mined" ] && [ "$ch" -gt "$mined" ]; then break; fi
+    sleep 1
+  done
+  jq -c --arg action "$(jq -r .plan_action "$file")" --arg value "$value" '{action:$action,value:$value,status,transactionHash,blockNumber,explorer:("https://explorer-testnet.maroo.io/tx/"+.transactionHash)}' "$receipt"
+}
+
+cmd_deposit() { # <name> <atokrw>
+  local n="$1" amt="$2" f
+  f="$(prepare "deposit-$n-$(date +%s)" "$n" deposit "${amt}${VP_DENOM}")"
+  send_call "$f" "$n" 'PrivacyDeposit(address,address,string,bytes)'
+}
+
+cmd_transfer() { # <from> <to_shielded> <atokrw> [policy] [mode] [pubkey]
+  local from="$1" to="$2" amt="$3" policy="${4:-all-private}" mode="${5:-none}" pubkey="${6:-}" f action out
+  local extra=(--privacy-policy "$policy" --disclosure-mode "$mode")
+  [ -n "$pubkey" ] && extra+=(--disclosure-pubkey "$pubkey")
+  # auto-dummy may first return a 0-value deposit plan (is_final=false); send it, then re-prepare.
+  for _ in 1 2 3; do
+    f="$(prepare "transfer-$from-$(date +%s)" "$from" transfer "$to" "${amt}${VP_DENOM}" --auto-dummy=true "${extra[@]}")"
+    action="$(jq -r .plan_action "$f")"
+    if [ "$action" = "deposit" ] || [ "$action" = "prepare_dummy" ]; then
+      log "sending dummy deposit first"
+      send_call "$f" "$from" 'PrivacyDeposit(address,address,string,bytes)' >&2
+      continue
+    fi
+    out="$(send_call "$f" "$from" 'PrivacyTransfer(address,address,bytes)')"
+    echo "$out" | jq -c --arg policy "$policy" --arg mode "$mode" '. + {privacyPolicy:$policy, disclosureMode:$mode}'
+    return 0
+  done
+  echo '{"error":"transfer did not reach final plan"}'; return 1
+}
+
+cmd_withdraw() { # <name> <atokrw> <recipient bech32|0x>
+  local n="$1" amt="$2" to="$3" f notes has
+  [[ "$to" == 0x* ]] && to="$(marood keys show "$n" -a --keyring-backend test --home "$VP_CLIENT_HOME")"
+  # Notes are UTXOs: withdraw needs one note of exactly <amt>. If none, create it with a shielded self-transfer.
+  notes="$(marood tx privacy list-notes --from "$n" --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --node "$VP_NODE" --json 2>/dev/null || echo '{}')"
+  has="$(echo "$notes" | jq -r --arg a "$amt" '[.notes[]? | select((.spent // false) == false) | select((.amount // .value // "") | tostring | test("^"+$a+"(atokrw)?$"))] | length')"
+  if [ "${has:-0}" = "0" ]; then
+    log "no exact note of $amt; self-transfer to create one"
+    local self; self="$(marood tx privacy show-address --from "$n" --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --output json 2>/dev/null | jq -r .address)"
+    cmd_transfer "$n" "$self" "$amt" all-private none >&2
+  fi
+  f="$(prepare "withdraw-$n-$(date +%s)" "$n" withdraw "${amt}${VP_DENOM}" --recipient "$to" --auto-dummy=false)"
+  send_call "$f" "$n" 'PrivacyWithdraw(address,address,address,string)'
+}
+
+cmd_notes() { # <name> -> my shielded notes (scans chain)
+  local n="$1" out
+  out="$(marood tx privacy list-notes --from "$n" --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --node "$VP_NODE" --json 2>/dev/null || echo '{"error":"list-notes failed"}')"
+  echo "$out" | jq -c --arg n "$n" '{name:$n, notes:.}'
+}
+
+cmd_dpubkey() { # <name> -> disclosure public key
+  marood tx privacy show-disclosure-pubkey --from "$1" --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --json 2>/dev/null | jq -c --arg n "$1" '. + {name:$n}'
+}
+
+cmd_decode() { # <name> <cosmos-tx-hash-no-0x> [plane]
+  local n="$1" tx="$2" plane="${3:-auto}"
+  marood tx privacy decode-disclosure --from "$n" --tx-hash "$tx" --disclosure-plane "$plane" \
+    --keyring-backend test --home "$VP_CLIENT_HOME" --chain-id "$VP_CHAIN_ID" --node "$VP_NODE" \
+    --zk-artifact-dir "$VP_ARTIFACT_DIR" --output json 2>/dev/null | jq -c '.' 2>/dev/null \
+    || jq -cn --arg n "$n" '{name:$n, error:"decode failed (wrong key or no disclosure for this key)"}'
+}
+
+cmd_txinfo() { # <evm-tx-hash> -> cosmos hash + receipt summary
+  local h="$1" r
+  r="$(cast receipt "$h" --rpc-url "$VP_RPC" --json)"
+  # Cosmos tx hash: look up by EVM hash via Comet tx_search on ethereum_tx.ethereumTxHash
+  local c
+  c="$(curl -fsS "$VP_NODE/tx_search?query=%22ethereum_tx.ethereumTxHash%3D%27$h%27%22" | jq -r '.result.txs[0].hash // empty')"
+  jq -cn --argjson r "$r" --arg c "$c" '{status:$r.status, block:$r.blockNumber, cosmosHash:$c, logs:($r.logs|length)}'
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  addr) cmd_addr "$@";; balance) cmd_balance "$@";; pool) cmd_pool;;
+  attest) cmd_attest "$@";; notes) cmd_notes "$@";; dpubkey) cmd_dpubkey "$@";; decode) cmd_decode "$@";; txinfo) cmd_txinfo "$@";; deposit) cmd_deposit "$@";; transfer) cmd_transfer "$@";; withdraw) cmd_withdraw "$@";;
+  *) echo "unknown command: $cmd" >&2; exit 2;;
+esac
